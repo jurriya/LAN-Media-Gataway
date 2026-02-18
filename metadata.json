@@ -1,0 +1,8 @@
+{
+  "name": "LAN Media Gateway",
+  "description": "A high-performance, aesthetically pleasing media center for local network storage. Features advanced file browsing, a professional video player with HLS support, high-resolution image previewing, and AI-powered media insights.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
