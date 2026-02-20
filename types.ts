@@ -13,7 +13,8 @@ export interface NasItem {
   path: string;
   is_dir: boolean;
   size: number | null;
-  modified_at: number | null;
+  modified_at?: number | null;
+  status?: 'none' | 'queued' | 'processing' | 'done' | 'error';
 }
 
 /** UI-friendly media item (derived from NasItem) */
@@ -27,6 +28,7 @@ export interface MediaItem {
   thumbnail?: string;
   isFavorite?: boolean;
   rawSize?: number | null;
+  status?: 'none' | 'queued' | 'processing' | 'done' | 'error';
 }
 
 export interface AppSettings {
@@ -38,16 +40,16 @@ export interface AppSettings {
 
 // ── helpers ──
 
-const VIDEO_EXTS = new Set(['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'ts', 'm4v', 'mpg', 'mpeg', '3gp']);
+const VIDEO_EXTS = new Set(['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'ts', 'm4v', 'mpg', 'mpeg', '3gp', 'm3u8']);
 const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico', 'tiff', 'tif', 'heic']);
-const DOC_EXTS   = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'csv', 'rtf']);
+const DOC_EXTS = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'csv', 'rtf']);
 
 export function inferFileType(filename: string, isDir: boolean): FileType {
   if (isDir) return FileType.FOLDER;
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
   if (VIDEO_EXTS.has(ext)) return FileType.VIDEO;
   if (IMAGE_EXTS.has(ext)) return FileType.IMAGE;
-  if (DOC_EXTS.has(ext))   return FileType.DOCUMENT;
+  if (DOC_EXTS.has(ext)) return FileType.DOCUMENT;
   return FileType.OTHER;
 }
 
@@ -84,5 +86,7 @@ export function nasItemToMediaItem(item: NasItem): MediaItem {
     thumbnail: type === FileType.IMAGE ? `/api/stream?path=${encodeURIComponent(item.path)}` : undefined,
     isFavorite: false,
     rawSize: item.size,
+    status: item.status,
   };
 }
+

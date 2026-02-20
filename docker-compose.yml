@@ -1,0 +1,18 @@
+services:
+  gateway:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - NAS_HOST=${NAS_HOST}
+      - NAS_SHARE=${NAS_SHARE}
+      - NAS_USER=${NAS_USER}
+      - NAS_PASS=${NAS_PASS}
+      - NAS_SERVER_NAME=${NAS_SERVER_NAME}
+      - CACHE_DIR=/cache
+      - NODE_OPTIONS=--openssl-legacy-provider
+    volumes:
+      - "./cache:/cache"
+      - "./backend:/app"
+      - "/app/node_modules"

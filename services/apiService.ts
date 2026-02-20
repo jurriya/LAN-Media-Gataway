@@ -1,33 +1,52 @@
 
-import { NasItem } from '../types';
+const API_BASE = '/api'; // Vite proxy forwards to localhost:8000/api
 
-/**
- * All requests go through Vite proxy (/api → localhost:8000).
- * In production, configure a reverse proxy or update the base URL.
- */
-const API_BASE = '';   // empty = same origin (vite proxy handles it)
-
-export async function fetchFileList(path: string = ''): Promise<NasItem[]> {
-    const res = await fetch(`${API_BASE}/api/list?path=${encodeURIComponent(path)}`);
-    if (!res.ok) throw new Error(`Failed to list files: ${res.status}`);
-    return res.json();
+export interface FileItem {
+    name: string;
+    path: string;
+    is_dir: boolean;
+    size: number | null;
+    status?: 'none' | 'queued' | 'processing' | 'done' | 'error';
 }
 
-export function getStreamUrl(path: string): string {
-    return `${API_BASE}/api/stream?path=${encodeURIComponent(path)}`;
-}
-
-export async function requestHls(path: string): Promise<{ id: string; m3u8_url: string }> {
-    const res = await fetch(`${API_BASE}/api/hls?path=${encodeURIComponent(path)}`);
-    if (!res.ok) throw new Error(`HLS request failed: ${res.status}`);
-    return res.json();
-}
-
-export async function checkHealth(): Promise<boolean> {
+export const fetchFileList = async (path: string = ''): Promise<FileItem[]> => {
     try {
-        const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3000) });
-        return res.ok;
-    } catch {
+        const url = `${API_BASE}/list?path=${encodeURIComponent(path)}`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Error fetching files: ${response.statusText}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching files:', error);
+        throw error;
+    }
+};
+
+// Alias for compatibility if needed elsewhere
+export const getFiles = fetchFileList;
+
+
+
+
+export const getStreamUrl = (path: string): string => {
+    return `${API_BASE}/stream?path=${encodeURIComponent(path)}`;
+};
+
+export const checkHealth = async (): Promise<boolean> => {
+    try {
+        // /health is defined in backend root and proxied by Vite
+        const response = await fetch('/health');
+        return response.ok;
+    } catch (error) {
+        console.error('Health check failed:', error);
         return false;
     }
-}
+};
+
+export const apiService = {
+    fetchFileList,
+    getFiles,
+    getStreamUrl,
+    checkHealth
+};

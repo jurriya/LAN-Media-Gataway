@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Cache & temp
+cache/
+tmp_*.json
+
+# Backend
+backend/node_modules
+backend/dist
+
+# Env
+.env

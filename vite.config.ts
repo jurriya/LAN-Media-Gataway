@@ -10,15 +10,19 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       proxy: {
         '/api': {
-          target: 'http://localhost:8000',
+          target: 'http://127.0.0.1:8000',
           changeOrigin: true,
+          timeout: 0,       // 不超时（流式视频可能持续数小时）
+          proxyTimeout: 0,  // 后端响应不超时
         },
         '/hls': {
-          target: 'http://localhost:8000',
+          target: 'http://127.0.0.1:8000',
           changeOrigin: true,
+          timeout: 0,
+          proxyTimeout: 0,
         },
         '/health': {
-          target: 'http://localhost:8000',
+          target: 'http://127.0.0.1:8000',
           changeOrigin: true,
         },
       },
