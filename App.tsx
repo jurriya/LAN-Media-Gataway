@@ -9,6 +9,7 @@ import VideoPlayer from './components/VideoPlayer';
 import ImagePreview from './components/ImagePreview';
 import Settings from './components/Settings';
 import MobileNav from './components/MobileNav';
+import DocumentViewer from './components/DocumentViewer';
 
 const AppContent: React.FC = () => {
   const navigate = useNavigate();
@@ -84,6 +85,15 @@ const AppContent: React.FC = () => {
       navigate('/play/' + encodeURIComponent(item.path));
     } else if (item.type === FileType.IMAGE) {
       navigate('/preview/' + encodeURIComponent(item.path));
+    } else if (item.type === FileType.DOCUMENT) {
+      const ext = item.name.split('.').pop()?.toLowerCase() || '';
+      const viewable = ['pdf', 'txt', 'md', 'log'].includes(ext);
+      if (viewable) {
+        navigate('/doc/' + encodeURIComponent(item.path));
+      } else {
+        // Office or other: direct download
+        window.open('/api/stream?path=' + encodeURIComponent(item.path), '_blank');
+      }
     }
   };
 
@@ -97,8 +107,10 @@ const AppContent: React.FC = () => {
     return matchesSearch && matchesFilter;
   });
 
-  // Hide chrome on player pages
-  const isPlayerPage = location.pathname.startsWith('/play/') || location.pathname.startsWith('/preview/');
+  // Hide chrome on player/viewer pages
+  const isPlayerPage = location.pathname.startsWith('/play/') ||
+    location.pathname.startsWith('/preview/') ||
+    location.pathname.startsWith('/doc/');
 
   return (
     <div className="flex flex-col min-h-screen min-h-[100dvh] bg-bg-app text-white transition-colors duration-300">
@@ -130,6 +142,9 @@ const AppContent: React.FC = () => {
           } />
           <Route path="/preview/:path" element={
             <ImagePreview />
+          } />
+          <Route path="/doc/:path" element={
+            <DocumentViewer />
           } />
           <Route path="/settings" element={
             <Settings settings={settings} setSettings={setSettings} />

@@ -69,6 +69,7 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
           { id: 'ALL', label: 'All', icon: 'apps' },
           { id: FileType.VIDEO, label: 'Videos', icon: 'movie' },
           { id: FileType.IMAGE, label: 'Images', icon: 'image' },
+          { id: FileType.DOCUMENT, label: 'Documents', icon: 'description' },
           { id: FileType.FOLDER, label: 'Folders', icon: 'folder' },
         ].map(cat => (
           <button
