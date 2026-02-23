@@ -31,6 +31,36 @@ export interface MediaItem {
   status?: 'none' | 'queued' | 'processing' | 'done' | 'error';
 }
 
+export type StorageType = 'smb' | 'webdav' | 'local' | 's3' | 'gdrive' | 'onedrive';
+
+export interface StorageSourceConfig {
+  host?: string;
+  share?: string;
+  username?: string;
+  password?: string;
+  serverName?: string;
+  url?: string;
+  mountPath?: string;
+  endpoint?: string;
+  bucket?: string;
+  accessKey?: string;
+  secretKey?: string;
+  region?: string;
+  // OAuth-based (Google Drive)
+  clientId?: string;
+  clientSecret?: string;
+  refreshToken?: string;
+  rootFolderId?: string;
+}
+
+export interface StorageSource {
+  id: string;
+  name: string;
+  type: StorageType;
+  config: StorageSourceConfig;
+  isActive: boolean;
+}
+
 export interface AppSettings {
   apiBaseUrl: string;
   defaultHls: boolean;

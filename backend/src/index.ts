@@ -3,10 +3,11 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs-extra';
 import path from 'path';
-import SMB2 from '@marsaud/smb2';
 import ffmpeg from 'fluent-ffmpeg';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import { StorageManager } from './storageManager';
+import { StorageType, StorageSourceConfig } from './storageTypes';
 
 dotenv.config();
 
@@ -33,22 +34,13 @@ const NAS_SHARE = process.env.NAS_SHARE || '';
 const NAS_USER = process.env.NAS_USER || '';
 const NAS_PASS = process.env.NAS_PASS || '';
 const CACHE_DIR = process.env.CACHE_DIR || '/cache';
-const BG_SCAN_INTERVAL = parseInt(process.env.BG_SCAN_INTERVAL || '1800000'); // 30 min default
+const BG_SCAN_INTERVAL = parseInt(process.env.BG_SCAN_INTERVAL || '1800000');
 
 fs.ensureDirSync(CACHE_DIR);
 fs.ensureDirSync(path.join(CACHE_DIR, 'hls'));
 
-function getSmbClient() {
-    return new SMB2({
-        share: `\\\\${NAS_HOST}\\${NAS_SHARE}`,
-        domain: 'WORKGROUP',
-        username: NAS_USER,
-        password: NAS_PASS,
-        autoCloseTimeout: 0,
-        cacheSize: 1024 * 1024, // 1MB cache for better throughput
-        autoRefresh: true
-    });
-}
+// ======================= STORAGE MANAGER =======================
+const storageManager = new StorageManager(CACHE_DIR);
 
 const FORMAT_MAP: Record<string, string> = {
     'ts': 'mpegts', 'mkv': 'matroska', 'avi': 'avi', 'mp4': 'mp4',
@@ -146,10 +138,11 @@ async function parsePlaylistInfo(hlsDir: string): Promise<{ totalDuration: numbe
 
 /**
  * Core transcoding engine
- * Uses CIFS-mounted file path when available for instant seeking,
- * falls back to SMB pipe streaming otherwise.
+ * Uses provider's getLocalPath() for instant seeking when available,
+ * falls back to stream piping otherwise.
  */
 async function startTranscode(filePath: string, requestedStartTime: number = 0) {
+    const provider = storageManager.getActiveProvider();
     const cacheKey = Buffer.from(filePath).toString('base64url');
     const hlsDir = path.join(CACHE_DIR, 'hls', cacheKey);
     const playlistPath = path.join(hlsDir, 'playlist.m3u8');
@@ -178,31 +171,25 @@ async function startTranscode(filePath: string, requestedStartTime: number = 0) 
         }
     }
 
-    // --- Determine input source: CIFS mount (fast seek) vs SMB pipe (slow) ---
-    const nasLocalPath = `/nas/${filePath}`;
-    const useCifsMount = await fs.pathExists(nasLocalPath);
+    // --- Determine input source: local path (fast seek) vs stream pipe (slow) ---
+    const localPath = provider.getLocalPath(filePath);
+    let inputSource: any;
 
-    let inputSource: string;
-    let client: any = null;
-
-    if (useCifsMount) {
-        // FAST PATH: File is accessible via CIFS mount → FFmpeg can seek natively
-        inputSource = nasLocalPath;
-        console.log(`HLS: Using CIFS mount (instant seek): ${nasLocalPath}`);
+    if (localPath) {
+        // FAST PATH: File is locally accessible → FFmpeg can seek natively
+        inputSource = localPath;
+        console.log(`HLS: Using local path (instant seek): ${localPath}`);
     } else {
-        // SLOW PATH: Fallback to SMB pipe (no seeking, must read from byte 0)
-        console.log(`HLS: CIFS mount not available, falling back to SMB pipe for ${filePath}`);
-        client = getSmbClient();
-        const smbPath = filePath.replace(/\//g, '\\');
-
+        // SLOW PATH: Stream pipe (no seeking, must read from byte 0)
+        console.log(`HLS: Using stream pipe for ${filePath}`);
         const PassThrough = require('stream').PassThrough;
         const pipeStream = new PassThrough();
         inputSource = pipeStream;
 
         (async () => {
             try {
-                const readStream = await client.createReadStream(smbPath);
-                readStream.pipe(pipeStream);
+                const readStream = await provider.getReadStream(filePath);
+                (readStream as any).pipe(pipeStream);
             } catch (err: any) {
                 console.error('Stream Error:', err.message);
                 pipeStream.destroy();
@@ -226,7 +213,6 @@ async function startTranscode(filePath: string, requestedStartTime: number = 0) 
     ];
 
     if (startTime > 0) {
-        // -ss before -i = input seeking (instant for files, fast-forward for pipes)
         inputOpts.unshift('-ss', startTime.toFixed(3));
     }
 
@@ -249,10 +235,10 @@ async function startTranscode(filePath: string, requestedStartTime: number = 0) 
 
     if (isResume) {
         outputOpts.push('-start_number', String(cachedSegments));
-        console.log(`Transcode: RESUMING ${filePath} from ${cachedSegments} segments (${startTime.toFixed(1)}s) [${useCifsMount ? 'CIFS' : 'PIPE'}]`);
+        console.log(`Transcode: RESUMING ${filePath} from ${cachedSegments} segments (${startTime.toFixed(1)}s) [${localPath ? 'LOCAL' : 'PIPE'}]`);
     } else {
         outputOpts.push('-start_number', '0');
-        console.log(`Transcode: STARTING ${filePath} at ${startTime.toFixed(1)}s [${useCifsMount ? 'CIFS' : 'PIPE'}]`);
+        console.log(`Transcode: STARTING ${filePath} at ${startTime.toFixed(1)}s [${localPath ? 'LOCAL' : 'PIPE'}]`);
     }
 
     const proc = ffmpeg(inputSource)
@@ -276,17 +262,15 @@ async function startTranscode(filePath: string, requestedStartTime: number = 0) 
             if (!isSuppressed) {
                 console.error(`FFmpeg error for ${filePath}:`, err.message);
             }
-            if (client) { try { client.close(); } catch { } }
             delete activeTranscodes[filePath];
         })
         .on('end', () => {
             console.log(`Transcode COMPLETE: ${filePath}`);
-            if (client) { try { client.close(); } catch { } }
             delete activeTranscodes[filePath];
         });
 
     proc.run();
-    activeTranscodes[filePath] = { proc, client: client || {}, retryLevel };
+    activeTranscodes[filePath] = { proc, client: {}, retryLevel };
     activeTranscodes[filePath].lastActiveTime = Date.now();
 }
 
@@ -313,57 +297,98 @@ function hasUserTranscodes(): boolean {
     return activeUserTranscodes || userIsWatching;
 }
 
+// ======================= STORAGE MANAGEMENT API =======================
+app.get('/api/storage/sources', (req, res) => {
+    res.json(storageManager.getSources());
+});
+
+app.post('/api/storage/sources', async (req, res) => {
+    try {
+        const { name, type, config } = req.body;
+        if (!name || !type) return res.status(400).json({ error: 'name and type required' });
+        const source = await storageManager.addSource(name, type as StorageType, config || {});
+        res.json(source);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/storage/sources/:id', async (req, res) => {
+    try {
+        const { name, config } = req.body;
+        const source = await storageManager.updateSource(req.params.id, { name, config });
+        if (!source) return res.status(404).json({ error: 'Source not found' });
+        res.json(source);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/storage/sources/:id', async (req, res) => {
+    const ok = await storageManager.deleteSource(req.params.id);
+    if (!ok) return res.status(404).json({ error: 'Source not found' });
+    res.json({ ok: true });
+});
+
+app.post('/api/storage/active', async (req, res) => {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const ok = await storageManager.setActive(id);
+    if (!ok) return res.status(404).json({ error: 'Source not found' });
+    res.json({ ok: true });
+});
+
+app.post('/api/storage/test', async (req, res) => {
+    try {
+        const { type, config } = req.body;
+        if (!type) return res.status(400).json({ error: 'type required' });
+        const result = await storageManager.testConnection(type as StorageType, config || {});
+        res.json(result);
+    } catch (err: any) {
+        res.status(500).json({ ok: false, message: err.message });
+    }
+});
+
 // ======================= LIST =======================
 app.get('/api/list', async (req, res) => {
     const relativePath = (req.query.path as string || '').replace(/\\/g, '/');
-    const client = getSmbClient();
-
     try {
-        const smbPath = relativePath ? relativePath.replace(/\//g, '\\') : '';
-        const files = await client.readdir(smbPath, { stats: true });
-
-        const items = await Promise.all(files.map(async (file: any) => {
-            const isDir = typeof file.isDirectory === 'function' ? file.isDirectory() : file.isDirectory;
-            const filePath = path.join(relativePath, file.name).replace(/\\/g, '/');
-
-            return {
-                name: file.name,
-                path: filePath,
-                is_dir: isDir,
-                size: file.size,
-            };
-        }));
-
-        items.sort((a, b) => (b.is_dir === a.is_dir) ? a.name.localeCompare(b.name) : (b.is_dir ? 1 : -1));
+        const provider = storageManager.getActiveProvider();
+        const items = await provider.listFiles(relativePath);
         res.json(items);
     } catch (err: any) {
         console.error('List error:', err);
         res.status(500).json({ error: err.message });
-    } finally {
-        try { await client.close(); } catch { }
     }
 });
 
-// ======================= STREAM (MP4 direct) =======================
+// ======================= STREAM / STATIC FILE (MP4, Images) =======================
 app.get('/api/stream', async (req, res) => {
     userLastActiveTime = Date.now();
     const filePath = (req.query.path as string || '').replace(/\\/g, '/');
     if (!filePath) return res.status(400).send('Path required');
 
-    if (!filePath.toLowerCase().endsWith('.mp4')) {
-        return res.status(415).json({ error: 'Use /api/hls/start for non-MP4 files' });
-    }
-
-    console.log('Stream: Direct MP4 for:', filePath);
-    const client = getSmbClient();
-    const smbPath = filePath.replace(/\//g, '\\');
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeMap: Record<string, string> = {
+        '.mp4': 'video/mp4',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml',
+        '.bmp': 'image/bmp',
+        '.ico': 'image/x-icon',
+        '.tiff': 'image/tiff',
+        '.tif': 'image/tiff',
+        '.heic': 'image/heic',
+    };
+    const contentType = mimeMap[ext] || 'application/octet-stream';
 
     try {
-        const size = await client.getSize(smbPath);
+        const provider = storageManager.getActiveProvider();
+        const size = await provider.getFileSize(filePath);
         const range = req.headers.range;
-
-        res.on('finish', () => { try { client.close(); } catch { } });
-        res.on('close', () => { try { client.close(); } catch { } });
 
         if (range) {
             const parts = range.replace(/bytes=/, "").split("-");
@@ -375,22 +400,21 @@ app.get('/api/stream', async (req, res) => {
                 'Content-Range': `bytes ${start}-${end}/${size}`,
                 'Accept-Ranges': 'bytes',
                 'Content-Length': chunksize,
-                'Content-Type': 'video/mp4',
+                'Content-Type': contentType,
             });
 
-            const stream = await client.createReadStream(smbPath, { start, end });
-            stream.pipe(res);
+            const stream = await provider.getReadStream(filePath, { start, end });
+            (stream as any).pipe(res);
         } else {
             res.writeHead(200, {
                 'Content-Length': size,
-                'Content-Type': 'video/mp4',
+                'Content-Type': contentType,
             });
-            const stream = await client.createReadStream(smbPath);
-            stream.pipe(res);
+            const stream = await provider.getReadStream(filePath);
+            (stream as any).pipe(res);
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('Stream error:', e);
-        try { await client.close(); } catch { }
         if (!res.headersSent) res.status(500).send('Stream error');
     }
 });
@@ -522,38 +546,30 @@ app.delete('/api/hls/stop', async (req, res) => {
     res.send('OK');
 });
 
-// ======================= BACKGROUND PRE-TRANSCODE =======================
-
 /**
- * Recursively scan a NAS directory and return media file paths.
- * Uses one SMB connection per directory to avoid timeout issues.
+ * Recursively scan a directory and return media file paths.
+ * Uses the active storage provider.
  */
 async function scanDirectory(dirPath: string): Promise<{ files: string[]; dirs: string[] }> {
-    const client = getSmbClient();
     const files: string[] = [];
     const dirs: string[] = [];
 
     try {
-        const smbPath = dirPath ? dirPath.replace(/\//g, '\\') : '';
-        const entries = await client.readdir(smbPath, { stats: true });
+        const provider = storageManager.getActiveProvider();
+        const entries = await provider.listFiles(dirPath);
 
         for (const entry of entries) {
-            const isDir = typeof entry.isDirectory === 'function' ? entry.isDirectory() : entry.isDirectory;
-            const fp = dirPath ? `${dirPath}/${entry.name}` : entry.name;
-
-            if (isDir) {
-                dirs.push(fp);
+            if (entry.is_dir) {
+                dirs.push(entry.path);
             } else {
                 const ext = entry.name.split('.').pop()?.toLowerCase() || '';
                 if (MEDIA_EXTS.has(ext)) {
-                    files.push(fp);
+                    files.push(entry.path);
                 }
             }
         }
     } catch (err: any) {
         console.error(`BG-Scan: Error reading "${dirPath}":`, err.message);
-    } finally {
-        try { await client.close(); } catch { }
     }
 
     return { files, dirs };
@@ -800,10 +816,22 @@ app.post('/api/pretranscode/toggle', (req, res) => {
 });
 
 // ======================= START SERVER =======================
-app.listen(8000, () => {
-    console.log('Server running on port 8000');
+async function startServer() {
+    // Initialize storage manager (loads config or creates default from env)
+    await storageManager.init({
+        host: NAS_HOST,
+        share: NAS_SHARE,
+        user: NAS_USER,
+        pass: NAS_PASS,
+    });
 
-    // Start the background pre-transcode loop (Commented out to stop background work)
-    console.log('BG-Transcode: Background pre-transcoding is DISABLED by user request');
-    // bgTranscodeLoop().catch(err => console.error('BG loop fatal:', err));
+    app.listen(8000, () => {
+        console.log('Server running on port 8000');
+        console.log('BG-Transcode: Background pre-transcoding is DISABLED by user request');
+    });
+}
+
+startServer().catch(err => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
 });
