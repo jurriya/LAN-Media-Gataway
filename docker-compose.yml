@@ -2,6 +2,7 @@ services:
   gateway:
     build: ./backend
     restart: unless-stopped
+    privileged: true
     ports:
       - "8000:8000"
     environment:
@@ -16,3 +17,12 @@ services:
       - "./cache:/cache"
       - "./backend:/app"
       - "/app/node_modules"
+      - nas_share:/nas:ro
+
+volumes:
+  nas_share:
+    driver: local
+    driver_opts:
+      type: cifs
+      device: "//${NAS_HOST}/${NAS_SHARE}"
+      o: "username=${NAS_USER},password=${NAS_PASS},uid=1000,gid=1000,iocharset=utf8,noperm"

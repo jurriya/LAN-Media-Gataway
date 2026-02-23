@@ -21,15 +21,14 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
 
   const getIcon = (type: FileType) => {
     switch (type) {
-      case FileType.FOLDER: return { icon: 'folder', color: 'text-primary' };
-      case FileType.VIDEO: return { icon: 'movie', color: 'text-blue-400' };
+      case FileType.FOLDER: return { icon: 'folder', color: 'text-primary-300' };
+      case FileType.VIDEO: return { icon: 'movie', color: 'text-pink-400' };
       case FileType.IMAGE: return { icon: 'image', color: 'text-emerald-400' };
-      case FileType.DOCUMENT: return { icon: 'description', color: 'text-red-500' };
-      default: return { icon: 'draft', color: 'text-slate-400' };
+      case FileType.DOCUMENT: return { icon: 'description', color: 'text-amber-400' };
+      default: return { icon: 'draft', color: 'text-white/30' };
     }
   };
 
-  // Build breadcrumb segments
   const pathSegments = currentPath ? currentPath.split('/') : [];
   const breadcrumbs: { label: string; path: string }[] = [
     { label: 'Home', path: '' }
@@ -42,59 +41,60 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col gap-5">
-      {/* Breadcrumb Navigation */}
-      <nav className="flex items-center gap-1 text-sm overflow-x-auto no-scrollbar">
+    <div className="max-w-7xl mx-auto px-3 md:px-4 py-4 flex flex-col gap-4 animate-fade-in">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1 text-xs overflow-x-auto no-scrollbar">
         {breadcrumbs.map((crumb, i) => (
           <React.Fragment key={crumb.path}>
             {i > 0 && (
-              <span className="material-symbols-outlined text-slate-400 text-base shrink-0">chevron_right</span>
+              <span className="material-symbols-outlined text-white/15 text-sm shrink-0">chevron_right</span>
             )}
             <button
               onClick={() => onNavigate(crumb.path)}
-              className={`shrink-0 px-2 py-1 rounded-md transition-colors ${i === breadcrumbs.length - 1
-                  ? 'font-semibold text-primary bg-primary/10'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-primary/5'
+              className={`shrink-0 px-2 py-1 rounded-lg transition-all ${i === breadcrumbs.length - 1
+                ? 'font-semibold text-primary bg-primary/10'
+                : 'text-white/30 hover:text-primary hover:bg-primary/5 active:bg-primary/10'
                 }`}
             >
-              {i === 0 && <span className="material-symbols-outlined text-sm align-middle mr-1">home</span>}
+              {i === 0 && <span className="material-symbols-outlined text-xs align-middle mr-1 filled">home</span>}
               {crumb.label}
             </button>
           </React.Fragment>
         ))}
       </nav>
 
-      {/* Filters */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+      {/* Filters - compact pills */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
         {[
-          { id: 'ALL', label: 'All Files', icon: 'apps' },
+          { id: 'ALL', label: 'All', icon: 'apps' },
           { id: FileType.VIDEO, label: 'Videos', icon: 'movie' },
           { id: FileType.IMAGE, label: 'Images', icon: 'image' },
-          { id: FileType.DOCUMENT, label: 'Documents', icon: 'description' },
           { id: FileType.FOLDER, label: 'Folders', icon: 'folder' },
         ].map(cat => (
           <button
             key={cat.id}
             onClick={() => setFilter(cat.id as any)}
-            className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${activeFilter === cat.id
-                ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                : 'bg-slate-200 dark:bg-primary/10 text-slate-700 dark:text-slate-300 hover:bg-primary/20'
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${activeFilter === cat.id
+              ? 'bg-primary text-white shadow-lg shadow-primary/20'
+              : 'bg-white/5 text-white/40 hover:bg-white/10 active:bg-white/15'
               }`}
           >
-            <span className="material-symbols-outlined text-lg">{cat.icon}</span>
+            <span className="material-symbols-outlined text-sm">{cat.icon}</span>
             {cat.label}
           </button>
         ))}
       </div>
 
-      {/* Error State */}
+      {/* Error */}
       {error && (
-        <div className="flex flex-col items-center justify-center py-16 gap-4">
-          <span className="material-symbols-outlined text-6xl text-red-400">cloud_off</span>
-          <p className="text-slate-500 dark:text-slate-400 text-center">{error}</p>
+        <div className="flex flex-col items-center justify-center py-16 gap-4 animate-fade-in">
+          <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center">
+            <span className="material-symbols-outlined text-3xl text-red-400">cloud_off</span>
+          </div>
+          <p className="text-white/40 text-sm text-center max-w-xs">{error}</p>
           <button
             onClick={onRetry}
-            className="px-5 py-2.5 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2"
+            className="px-5 py-2.5 bg-primary text-white rounded-xl font-semibold text-sm hover:bg-primary-600 active:scale-95 transition-all flex items-center gap-2"
           >
             <span className="material-symbols-outlined text-lg">refresh</span>
             Retry
@@ -104,98 +104,94 @@ const FileBrowser: React.FC<FileBrowserProps> = ({
 
       {/* Loading Skeleton */}
       {loading && !error && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="animate-pulse flex flex-col gap-3 p-4 bg-white dark:bg-primary/5 border border-slate-200 dark:border-primary/10 rounded-xl">
-              <div className="aspect-video rounded-lg bg-slate-200 dark:bg-primary/20" />
-              <div className="h-4 bg-slate-200 dark:bg-primary/15 rounded w-3/4" />
-              <div className="h-3 bg-slate-200 dark:bg-primary/10 rounded w-1/2" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="animate-shimmer skeleton rounded-2xl p-3 flex gap-3 h-16">
+              <div className="w-10 h-10 rounded-xl bg-white/5 shrink-0" />
+              <div className="flex-1 space-y-2 py-1">
+                <div className="h-3 bg-white/5 rounded w-3/4" />
+                <div className="h-2 bg-white/5 rounded w-1/2" />
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Empty State */}
+      {/* Empty */}
       {!loading && !error && items.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <span className="material-symbols-outlined text-6xl text-slate-300 dark:text-slate-600">folder_off</span>
-          <p className="text-slate-500 dark:text-slate-400">This folder is empty</p>
+        <div className="flex flex-col items-center justify-center py-20 gap-3 animate-fade-in">
+          <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center">
+            <span className="material-symbols-outlined text-3xl text-white/20">folder_off</span>
+          </div>
+          <p className="text-white/30 text-sm">This folder is empty</p>
         </div>
       )}
 
-      {/* Grid */}
+      {/* File List - mobile-optimized list/grid hybrid */}
       {!loading && !error && items.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-          {/* Go Up button when in a subdirectory */}
+        <div className="flex flex-col gap-1">
+          {/* Go Up */}
           {currentPath && (
-            <div
+            <button
               onClick={() => {
                 const parent = currentPath.split('/').slice(0, -1).join('/');
                 onNavigate(parent);
               }}
-              className="group flex flex-col gap-3 p-4 bg-white dark:bg-primary/5 border border-slate-200 dark:border-primary/10 rounded-xl hover:border-primary/50 transition-all cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1"
+              className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.02] hover:bg-white/5 active:bg-white/10 transition-all group"
             >
-              <div className="aspect-video rounded-lg bg-slate-100 dark:bg-primary/20 flex items-center justify-center">
-                <span className="material-symbols-outlined text-5xl text-primary">drive_folder_upload</span>
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-primary text-xl">arrow_upward</span>
               </div>
-              <div>
-                <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">.. Go Up</h3>
-                <p className="text-xs text-slate-500 mt-1">Parent directory</p>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-sm font-medium text-white/70">Go Up</p>
+                <p className="text-[11px] text-white/20">Parent directory</p>
               </div>
-            </div>
+            </button>
           )}
 
-          {items.map(item => {
+          {items.map((item, index) => {
             const { icon, color } = getIcon(item.type);
+            const isVideo = item.type === FileType.VIDEO;
+            const isFolder = item.type === FileType.FOLDER;
+
             return (
-              <div
+              <button
                 key={item.id}
                 onClick={() => onItemClick(item)}
-                className="group relative flex flex-col gap-3 p-4 bg-white dark:bg-primary/5 border border-slate-200 dark:border-primary/10 rounded-xl hover:border-primary/50 transition-all cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1"
+                className="flex items-center gap-3 p-3 rounded-2xl hover:bg-white/5 active:bg-white/10 transition-all group text-left animate-slide-up"
+                style={{ animationDelay: `${Math.min(index * 20, 200)}ms` }}
               >
-                <div className="aspect-video rounded-lg bg-slate-100 dark:bg-primary/20 flex items-center justify-center overflow-hidden relative">
+                {/* Icon/Thumbnail */}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isVideo ? 'bg-pink-500/10' : isFolder ? 'bg-primary/10' : 'bg-white/5'
+                  }`}>
                   {item.thumbnail ? (
-                    <>
-                      <img
-                        src={item.thumbnail}
-                        alt={item.name}
-                        className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500"
-                        onError={(e) => {
-                          // Fallback to icon on image load error
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                      {item.type === FileType.VIDEO && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="bg-primary text-white p-2 rounded-full shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
-                            <span className="material-symbols-outlined text-2xl filled">play_arrow</span>
-                          </div>
-                        </div>
-                      )}
-                    </>
+                    <img src={item.thumbnail} alt="" className="w-full h-full object-cover rounded-xl" />
                   ) : (
-                    <span className={`material-symbols-outlined text-6xl ${color}`}>{icon}</span>
-                  )}
-                  {item.type === FileType.VIDEO && (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="bg-primary text-white p-2 rounded-full shadow-lg">
-                        <span className="material-symbols-outlined text-2xl filled">play_arrow</span>
-                      </div>
-                    </div>
+                    <span className={`material-symbols-outlined text-xl ${color} ${isFolder ? 'filled' : ''}`}>{icon}</span>
                   )}
                 </div>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 pr-2 overflow-hidden">
-                    <h3 className="font-semibold text-sm line-clamp-2 text-slate-900 dark:text-slate-100">{item.name}</h3>
-                    <p className="text-xs text-slate-500 mt-1 truncate">
-                      {item.size !== '—' ? item.size : ''}{item.size !== '—' && item.modified !== '—' ? ' • ' : ''}{item.modified !== '—' ? item.modified : ''}
-                    </p>
-                  </div>
-                  <div className={`shrink-0 ${color}`}>
-                    <span className="material-symbols-outlined text-lg">{icon}</span>
-                  </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white/90 truncate leading-tight">{item.name}</p>
+                  <p className="text-[11px] text-white/25 mt-0.5">
+                    {item.size !== '—' ? item.size : ''}
+                    {isVideo && <span className="inline-flex items-center ml-1.5 text-pink-400/50">• Video</span>}
+                    {isFolder && <span className="inline-flex items-center ml-1.5 text-primary-300/50">• Folder</span>}
+                  </p>
                 </div>
-              </div>
+
+                {/* Action hint */}
+                <div className="shrink-0 text-white/10 group-hover:text-white/30 transition-colors">
+                  {isVideo ? (
+                    <span className="material-symbols-outlined text-lg filled text-pink-400/40">play_circle</span>
+                  ) : isFolder ? (
+                    <span className="material-symbols-outlined text-lg">chevron_right</span>
+                  ) : (
+                    <span className="material-symbols-outlined text-lg">open_in_new</span>
+                  )}
+                </div>
+              </button>
             );
           })}
         </div>

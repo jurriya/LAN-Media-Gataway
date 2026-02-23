@@ -12,28 +12,28 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, serverOnli
   const navigate = useNavigate();
 
   return (
-    <header className="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-primary/20">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 glass border-b border-white/5 safe-top">
+      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
         {/* Logo */}
         <div
-          className="flex items-center gap-2 shrink-0 cursor-pointer"
+          className="flex items-center gap-2.5 shrink-0 cursor-pointer"
           onClick={() => navigate('/')}
         >
-          <div className="bg-primary p-1.5 rounded-lg flex items-center justify-center text-white">
-            <span className="material-symbols-outlined text-2xl">settings_input_component</span>
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
+            <span className="material-symbols-outlined text-white text-lg filled">play_circle</span>
           </div>
-          <h1 className="text-lg font-bold tracking-tight hidden sm:block text-slate-900 dark:text-white">
-            LAN Media <span className="text-primary">Gateway</span>
+          <h1 className="text-base font-bold tracking-tight hidden sm:block">
+            <span className="gradient-text">MediaFlow</span>
           </h1>
         </div>
 
         {/* Search Bar */}
-        <div className="flex-1 max-w-xl group">
+        <div className="flex-1 max-w-md">
           <div className="relative flex items-center">
-            <span className="material-symbols-outlined absolute left-3 text-slate-400">search</span>
+            <span className="material-symbols-outlined absolute left-3 text-white/30 text-[20px]">search</span>
             <input
-              className="w-full bg-slate-200 dark:bg-primary/10 border-none rounded-full pl-10 pr-4 h-10 focus:ring-2 focus:ring-primary transition-all placeholder:text-slate-500 dark:placeholder:text-slate-400 text-slate-900 dark:text-white"
-              placeholder="Search movies, photos, or documents..."
+              className="w-full bg-white/5 border border-white/5 rounded-xl pl-10 pr-4 h-9 text-sm focus:ring-1 focus:ring-primary/50 focus:bg-white/10 transition-all placeholder:text-white/25 text-white outline-none"
+              placeholder="Search..."
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -41,23 +41,19 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, serverOnli
           </div>
         </div>
 
-        {/* Desktop Header Actions */}
-        <div className="hidden md:flex items-center gap-1 sm:gap-3">
-          {/* Server status indicator */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-primary/10" title={serverOnline ? 'Server connected' : 'Server offline'}>
-            <div className={`w-2 h-2 rounded-full ${serverOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              {serverOnline ? 'NAS Online' : 'Offline'}
+        {/* Status */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5" title={serverOnline ? 'NAS Connected' : 'Offline'}>
+            <div className={`w-1.5 h-1.5 rounded-full ${serverOnline ? 'bg-emerald-400 animate-pulse-soft' : 'bg-red-500'}`} />
+            <span className="text-[11px] font-medium text-white/40 hidden sm:block">
+              {serverOnline ? 'NAS' : 'Offline'}
             </span>
           </div>
-          <button className="p-2 hover:bg-slate-200 dark:hover:bg-primary/20 rounded-full transition-colors text-slate-600 dark:text-slate-400 hover:text-primary">
-            <span className="material-symbols-outlined">schedule</span>
-          </button>
           <button
-            className="p-2 hover:bg-slate-200 dark:hover:bg-primary/20 rounded-full transition-colors text-slate-600 dark:text-slate-400 hover:text-primary"
+            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/40 hover:text-white md:flex hidden"
             onClick={() => navigate('/settings')}
           >
-            <span className="material-symbols-outlined">settings</span>
+            <span className="material-symbols-outlined text-[20px]">settings</span>
           </button>
         </div>
       </div>

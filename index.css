@@ -1,7 +1,7 @@
-/* LAN Media Gateway - Base Styles */
-/* Primary styling handled by Tailwind CSS CDN */
-
-*, *::before, *::after {
+/* MediaFlow - Global Styles */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -10,4 +10,68 @@ body {
   padding: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
+}
+
+/* Mobile tap highlight removal */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom scrollbar for desktop */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.3);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.5);
+  }
+}
+
+/* Video player in fullscreen */
+video:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
+}
+
+video:-moz-full-screen {
+  width: 100%;
+  height: 100%;
+}
+
+video:fullscreen {
+  width: 100%;
+  height: 100%;
+}
+
+/* Disable pull-to-refresh on mobile */
+html {
+  overscroll-behavior: none;
+}
+
+/* Smooth page transitions */
+.page-enter {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

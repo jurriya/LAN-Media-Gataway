@@ -14,7 +14,6 @@ const AppContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [items, setItems] = useState<MediaItem[]>([]);
-  const [activeItem, setActiveItem] = useState<MediaItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'ALL' | FileType>('ALL');
   const [currentPath, setCurrentPath] = useState('');
@@ -28,19 +27,24 @@ const AppContent: React.FC = () => {
     theme: 'dark'
   });
 
-  // Check server health on mount
+  // Restore settings from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('mediaflow_settings');
+    if (saved) {
+      try { setSettings(JSON.parse(saved)); } catch { }
+    }
+  }, []);
+
   useEffect(() => {
     checkHealth().then(setServerOnline);
   }, []);
 
-  // Load file list when currentPath changes
   const loadFiles = useCallback(async (path: string) => {
     setLoading(true);
     setError(null);
     try {
       const nasItems: NasItem[] = await fetchFileList(path);
       const mapped = nasItems.map(nasItemToMediaItem);
-      // Sort: folders first, then by name
       mapped.sort((a, b) => {
         if (a.type === FileType.FOLDER && b.type !== FileType.FOLDER) return -1;
         if (a.type !== FileType.FOLDER && b.type === FileType.FOLDER) return 1;
@@ -59,11 +63,24 @@ const AppContent: React.FC = () => {
     loadFiles(currentPath);
   }, [currentPath, loadFiles]);
 
+  // Save recent path
+  useEffect(() => {
+    if (currentPath) {
+      const recents = JSON.parse(localStorage.getItem('mediaflow_recent_paths') || '[]');
+      const updated = [currentPath, ...recents.filter((p: string) => p !== currentPath)].slice(0, 10);
+      localStorage.setItem('mediaflow_recent_paths', JSON.stringify(updated));
+    }
+  }, [currentPath]);
+
   const handleItemClick = (item: MediaItem) => {
-    setActiveItem(item);
     if (item.type === FileType.FOLDER) {
       setCurrentPath(item.path);
     } else if (item.type === FileType.VIDEO) {
+      // Save to recently played
+      const history = JSON.parse(localStorage.getItem('mediaflow_history') || '[]');
+      const entry = { path: item.path, name: item.name, time: Date.now() };
+      const updated = [entry, ...history.filter((h: any) => h.path !== item.path)].slice(0, 50);
+      localStorage.setItem('mediaflow_history', JSON.stringify(updated));
       navigate('/play/' + encodeURIComponent(item.path));
     } else if (item.type === FileType.IMAGE) {
       navigate('/preview/' + encodeURIComponent(item.path));
@@ -80,15 +97,20 @@ const AppContent: React.FC = () => {
     return matchesSearch && matchesFilter;
   });
 
-  return (
-    <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark transition-colors duration-300">
-      <Header
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        serverOnline={serverOnline}
-      />
+  // Hide chrome on player pages
+  const isPlayerPage = location.pathname.startsWith('/play/') || location.pathname.startsWith('/preview/');
 
-      <main className="flex-1 pb-24 md:pb-6">
+  return (
+    <div className="flex flex-col min-h-screen min-h-[100dvh] bg-bg-app text-white transition-colors duration-300">
+      {!isPlayerPage && (
+        <Header
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          serverOnline={serverOnline}
+        />
+      )}
+
+      <main className={`flex-1 ${isPlayerPage ? '' : 'pb-20 md:pb-6'}`}>
         <Routes>
           <Route path="/" element={
             <FileBrowser
@@ -104,23 +126,18 @@ const AppContent: React.FC = () => {
             />
           } />
           <Route path="/play/:path" element={
-            <VideoPlayer
-              settings={settings}
-            />
+            <VideoPlayer settings={settings} />
           } />
           <Route path="/preview/:path" element={
             <ImagePreview />
           } />
           <Route path="/settings" element={
-            <Settings
-              settings={settings}
-              setSettings={setSettings}
-            />
+            <Settings settings={settings} setSettings={setSettings} />
           } />
         </Routes>
       </main>
 
-      <MobileNav />
+      {!isPlayerPage && <MobileNav />}
     </div>
   );
 };
