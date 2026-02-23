@@ -63,6 +63,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ settings }) => {
     const [mode, setMode] = useState<'direct' | 'hls' | 'native-hls' | 'cached'>('direct');
     const [resumed, setResumed] = useState(0);
     const [resumedAt, setResumedAt] = useState(0); // For toast
+    const [isCachedComplete, setIsCachedComplete] = useState(false); // Backend said cache is fully done
 
     // Playback state
     const [playing, setPlaying] = useState(false);
@@ -124,6 +125,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ settings }) => {
                 if (!mounted) return;
 
                 if (data.resumedFrom) setResumed(data.resumedFrom);
+                if (data.cached) setIsCachedComplete(true);
 
                 // Cached MP4 stream
                 if (data.mode === 'cached') {
@@ -345,7 +347,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ settings }) => {
     useEffect(() => { const v = videoRef.current as any; if (v?.webkitShowPlaybackTargetPicker) setAirPlay(true); }, []);
 
     // ---- Is transcoding complete? ----
-    const isComplete = totalDur > 0 && isFinite(totalDur) && seekEnd >= totalDur - 1;
+    // Use backend's cached flag OR browser's seekable/duration comparison
+    const isComplete = isCachedComplete || isMp4 || (totalDur > 0 && isFinite(totalDur) && seekEnd >= totalDur - 1);
 
     return (
         <div className="flex flex-col min-h-screen min-h-[100dvh] bg-black">
